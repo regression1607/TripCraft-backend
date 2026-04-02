@@ -3,6 +3,12 @@ const router = express.Router();
 const User = require('../models/User');
 const verifyToken = require('../middleware/auth');
 
+function generateUsername(name) {
+  const base = (name || 'user').toLowerCase().replace(/[^a-z]/g, '').slice(0, 10);
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `${base || 'user'}${random}`;
+}
+
 router.post('/verify', verifyToken, async (req, res) => {
   try {
     const { uid, name, email, picture } = req.user;
@@ -14,8 +20,21 @@ router.post('/verify', verifyToken, async (req, res) => {
     let user = await User.findOne({ firebaseUid: uid });
 
     if (!user) {
+      // Auto-generate unique username with fallback
+      let username;
+      let usernameFound = false;
+      for (let i = 0; i < 10; i++) {
+        username = generateUsername(name || email.split('@')[0]);
+        const exists = await User.findOne({ username });
+        if (!exists) { usernameFound = true; break; }
+      }
+      if (!usernameFound) {
+        username = `user${Date.now().toString(36)}`;
+      }
+
       user = await User.create({
         firebaseUid: uid,
+        username,
         name: name || email.split('@')[0] || 'User',
         email,
         avatar: picture || '',
