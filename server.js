@@ -52,7 +52,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'TripCraft API' });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`TripCraft API running on port ${PORT}`);
-});
+// Export for Vercel serverless
+module.exports = app;
+
+// Local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`TripCraft API running on port ${PORT}`);
+  });
+}
