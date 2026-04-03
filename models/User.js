@@ -18,6 +18,12 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String, default: '' },
   defaultCurrency: { type: String, default: 'USD' },
   fcmToken: { type: String, default: '' },
+  lastLocation: {
+    lat: { type: Number },
+    lng: { type: Number },
+    updatedAt: { type: Date },
+  },
+  isNearbyActive: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 
