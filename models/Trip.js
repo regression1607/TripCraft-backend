@@ -32,6 +32,7 @@ const tripSchema = new mongoose.Schema({
     enum: ['fast', 'balanced', 'slow'],
     default: 'balanced',
   },
+  transportModes: [{ type: String }],
   travelStyle: [{ type: String }],
   interests: [{ type: String }],
   specialRequirements: { type: String, default: '' },

@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
     }
 
     const { destination, currentLocation, arrivalDate, departureDate, days,
-      budget, accommodation, travelPace, travelStyle, interests, specialRequirements } = req.body;
+      budget, accommodation, travelPace, transportModes, travelStyle, interests, specialRequirements } = req.body;
 
     // Validation
     if (!destination?.name) return res.status(400).json({ error: 'Destination name is required' });
@@ -88,6 +88,7 @@ router.post('/', async (req, res) => {
       },
       accommodation: ['hotel','hostel','airbnb','any'].includes(accommodation) ? accommodation : 'any',
       travelPace: ['fast','balanced','slow'].includes(travelPace) ? travelPace : 'balanced',
+      transportModes: Array.isArray(transportModes) ? transportModes.slice(0, 5).map(s => String(s).slice(0, 20)) : [],
       travelStyle: Array.isArray(travelStyle) ? travelStyle.slice(0, 10).map(s => String(s).slice(0, 50)) : [],
       interests: Array.isArray(interests) ? interests.slice(0, 15).map(s => String(s).slice(0, 50)) : [],
       specialRequirements: String(specialRequirements || '').slice(0, 500),

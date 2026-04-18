@@ -1,4 +1,7 @@
 function buildItineraryPrompt(trip) {
+  const transportModes = trip.transportModes?.length > 0 ? trip.transportModes.join(', ') : 'any';
+  const hasCarOrBike = trip.transportModes?.some(m => ['car', 'bike'].includes(m));
+
   return `You are a professional solo travel planner. Create a detailed day-by-day itinerary for a solo traveler.
 
 TRIP DETAILS:
@@ -9,7 +12,7 @@ TRIP DETAILS:
 - Departure: ${trip.departureDate}
 - Total Budget: ${trip.budget.amount} ${trip.budget.currency}
 - Accommodation: ${trip.accommodation}
-- Travel Pace: ${trip.travelPace}
+- Transport Modes: ${transportModes}
 - Travel Style: ${trip.travelStyle?.join(', ') || 'Mixed'}
 - Interests: ${trip.interests?.join(', ') || 'General'}
 - Special Requirements: ${trip.specialRequirements || 'None'}
@@ -19,11 +22,13 @@ REQUIREMENTS:
 2. Include real place names with approximate GPS coordinates (lat/lng)
 3. Include estimated costs for each activity in ${trip.budget.currency}
 4. Suggest specific restaurants with cuisine type
-5. Include transport suggestions between locations
-6. Stay within the total budget
-7. Match the travel pace (${trip.travelPace})
-8. Include a budget breakdown by category
-9. Include a packing list based on destination weather and activities
+5. Use ONLY these transport modes between locations: ${transportModes}
+6. Stay within the total budget of ${trip.budget.amount} ${trip.budget.currency}
+7. Include a budget breakdown by category
+8. Include a packing list based on destination weather and activities
+${hasCarOrBike ? `9. IMPORTANT: For car/bike travel, include approximate toll costs and fuel costs in the transport section for each journey segment. Use "tollCost" and "fuelCost" fields in the transport object.` : ''}
+
+All costs must be in ${trip.budget.currency}.
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -40,7 +45,7 @@ Respond ONLY with valid JSON in this exact format:
           "cost": 0,
           "description": "Brief description",
           "rating": 4.5,
-          "transport": { "mode": "walk|train|bus|taxi", "duration": "10 min", "cost": 0 }
+          "transport": { "mode": "${transportModes.split(',')[0]?.trim() || 'walk'}", "duration": "10 min", "cost": 0${hasCarOrBike ? ', "tollCost": 0, "fuelCost": 0' : ''} }
         }
       ]
     }
@@ -50,7 +55,7 @@ Respond ONLY with valid JSON in this exact format:
     "food": 0,
     "transport": 0,
     "activities": 0,
-    "shopping": 0,
+    "shopping": 0,${hasCarOrBike ? '\n    "tolls": 0,\n    "fuel": 0,' : ''}
     "total": 0
   },
   "packingList": [
