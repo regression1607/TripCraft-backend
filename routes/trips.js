@@ -16,8 +16,43 @@ async function getUserId(req) {
 // POST /api/trips - Create trip (whitelist fields, no mass assignment)
 router.post('/', async (req, res) => {
   try {
-    const userId = await getUserId(req);
-    if (!userId) return res.status(404).json({ error: 'User not found' });
+    const user = await User.findOne({ firebaseUid: req.user.uid });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const userId = user._id;
+
+    // ── Subscription limit check ──
+    const sub = user.subscription || {};
+    const tier = sub.tier || 'free';
+    const now = new Date();
+
+    // Check if subscription expired → revert to free
+    if (tier !== 'free' && sub.expiresAt && new Date(sub.expiresAt) < now) {
+      user.subscription.tier = 'free';
+      user.subscription.expiresAt = null;
+      await user.save();
+      return res.status(403).json({ error: 'subscription_expired', message: 'Your subscription has expired. Please renew to create more trips.' });
+    }
+
+    // Reset monthly trips if month passed
+    if (tier === 'monthly' && sub.tripsResetAt && new Date(sub.tripsResetAt) < now) {
+      user.subscription.tripsThisMonth = 0;
+      user.subscription.tripsResetAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      await user.save();
+    }
+
+    // Check limits
+    const totalTrips = sub.totalTripsCreated || 0;
+    const monthlyTrips = sub.tripsThisMonth || 0;
+
+    if (tier === 'free' && totalTrips >= 1) {
+      return res.status(403).json({ error: 'subscription_required', message: 'You\'ve used your free trip. Upgrade to create more!' });
+    }
+    if (tier === 'monthly' && monthlyTrips >= 10) {
+      return res.status(403).json({ error: 'trip_limit', message: 'You\'ve used all 10 trips this month. Wait for reset or upgrade to yearly.' });
+    }
+    if (tier === 'yearly' && totalTrips >= 100) {
+      return res.status(403).json({ error: 'trip_limit', message: 'You\'ve reached the 100 trip limit for your yearly plan.' });
+    }
 
     const { destination, currentLocation, arrivalDate, departureDate, days,
       budget, accommodation, travelPace, travelStyle, interests, specialRequirements } = req.body;
@@ -57,6 +92,12 @@ router.post('/', async (req, res) => {
       interests: Array.isArray(interests) ? interests.slice(0, 15).map(s => String(s).slice(0, 50)) : [],
       specialRequirements: String(specialRequirements || '').slice(0, 500),
     });
+
+    // Increment trip counters
+    if (!user.subscription) user.subscription = {};
+    user.subscription.totalTripsCreated = (user.subscription.totalTripsCreated || 0) + 1;
+    user.subscription.tripsThisMonth = (user.subscription.tripsThisMonth || 0) + 1;
+    await user.save();
 
     res.status(201).json({ trip });
   } catch (error) {

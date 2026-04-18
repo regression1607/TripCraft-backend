@@ -18,6 +18,14 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String, default: '' },
   defaultCurrency: { type: String, default: 'USD' },
   fcmToken: { type: String, default: '' },
+  subscription: {
+    tier: { type: String, enum: ['free', 'monthly', 'yearly'], default: 'free' },
+    startDate: { type: Date },
+    expiresAt: { type: Date },
+    tripsThisMonth: { type: Number, default: 0 },
+    tripsResetAt: { type: Date },
+    totalTripsCreated: { type: Number, default: 0 },
+  },
   createdAt: { type: Date, default: Date.now },
 });
 

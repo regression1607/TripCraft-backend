@@ -9,6 +9,7 @@ const itineraryRoutes = require('./routes/itinerary');
 const weatherRoutes = require('./routes/weather');
 const userRoutes = require('./routes/users');
 const chatRoutes = require('./routes/chat');
+const subscriptionRoutes = require('./routes/subscription');
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/itinerary', itineraryRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'TripCraft API' });
