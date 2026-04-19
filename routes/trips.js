@@ -113,7 +113,9 @@ router.get('/', async (req, res) => {
     const userId = await getUserId(req);
     if (!userId) return res.status(404).json({ error: 'User not found' });
 
-    const trips = await Trip.find({ userId }).sort({ createdAt: -1 }).lean();
+    const trips = await Trip.find({
+      $or: [{ userId }, { 'sharedWith.userId': userId }],
+    }).sort({ createdAt: -1 }).lean();
 
     // Batch lookup coords for trips missing them
     const tripsNeedingCoords = trips.filter(t => !t.destination?.lat || !t.destination?.lng);
@@ -138,8 +140,27 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/trips/:id - Get trip + itinerary (with ownership check)
+// GET /api/trips/:id - Get trip + itinerary (owner OR shared user)
 router.get('/:id', async (req, res) => {
+  try {
+    const userId = await getUserId(req);
+    if (!userId) return res.status(404).json({ error: 'User not found' });
+
+    const trip = await Trip.findOne({
+      _id: req.params.id,
+      $or: [{ userId }, { 'sharedWith.userId': userId }],
+    }).populate('sharedWith.userId', 'name email username avatar');
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    const itinerary = await Itinerary.findOne({ tripId: trip._id });
+    res.json({ trip, itinerary });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch trip' });
+  }
+});
+
+// POST /api/trips/:id/share - Generate share code
+router.post('/:id/share', async (req, res) => {
   try {
     const userId = await getUserId(req);
     if (!userId) return res.status(404).json({ error: 'User not found' });
@@ -147,10 +168,62 @@ router.get('/:id', async (req, res) => {
     const trip = await Trip.findOne({ _id: req.params.id, userId });
     if (!trip) return res.status(404).json({ error: 'Trip not found' });
 
-    const itinerary = await Itinerary.findOne({ tripId: trip._id });
-    res.json({ trip, itinerary });
+    if (!trip.shareCode) {
+      trip.shareCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+      await trip.save();
+    }
+
+    res.json({ shareCode: trip.shareCode });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch trip' });
+    res.status(500).json({ error: 'Failed to generate share code' });
+  }
+});
+
+// POST /api/trips/join/:code - Join trip via share code
+router.post('/join/:code', async (req, res) => {
+  try {
+    const userId = await getUserId(req);
+    if (!userId) return res.status(404).json({ error: 'User not found' });
+
+    const trip = await Trip.findOne({ shareCode: req.params.code.toUpperCase() });
+    if (!trip) return res.status(404).json({ error: 'Invalid share code' });
+
+    // Check if already joined
+    const alreadyShared = trip.sharedWith?.some(s => s.userId.toString() === userId.toString());
+    if (trip.userId.toString() === userId.toString() || alreadyShared) {
+      return res.json({ trip, message: 'Already a member of this trip' });
+    }
+
+    trip.sharedWith.push({ userId, role: 'editor' });
+    await trip.save();
+
+    res.json({ trip, message: 'Joined trip successfully!' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to join trip' });
+  }
+});
+
+// GET /api/trips/:id/members - Get trip members
+router.get('/:id/members', async (req, res) => {
+  try {
+    const userId = await getUserId(req);
+    if (!userId) return res.status(404).json({ error: 'User not found' });
+
+    const trip = await Trip.findOne({
+      _id: req.params.id,
+      $or: [{ userId }, { 'sharedWith.userId': userId }],
+    })
+      .populate('userId', 'name email username avatar')
+      .populate('sharedWith.userId', 'name email username avatar');
+
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    const owner = { user: trip.userId, role: 'owner' };
+    const members = (trip.sharedWith || []).map(s => ({ user: s.userId, role: s.role }));
+
+    res.json({ members: [owner, ...members] });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get members' });
   }
 });
 

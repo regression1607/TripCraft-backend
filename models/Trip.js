@@ -41,6 +41,12 @@ const tripSchema = new mongoose.Schema({
     enum: ['generating', 'ready', 'error'],
     default: 'generating',
   },
+  sharedWith: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    role: { type: String, enum: ['viewer', 'editor'], default: 'editor' },
+    addedAt: { type: Date, default: Date.now },
+  }],
+  shareCode: { type: String, unique: true, sparse: true },
   createdAt: { type: Date, default: Date.now },
 });
 
